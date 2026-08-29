@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>M&P Studio AI</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+  * { box-sizing: border-box; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; background: #12293a; margin: 0; padding: 20px; }
+
+  .layout { display: flex; gap: 16px; max-width: 1400px; margin: 0 auto; height: calc(100vh - 40px); }
+
+  .dashboard { flex: 1.4; background: #4a4d5e; border-radius: 14px; padding: 20px; overflow-y: auto; }
+  .dashboard h2 { color: #f0d9c8; margin: 0 0 4px 0; font-size: 20px; }
+  .dashboard .tagline { color: #d99e79; font-size: 12px; margin-bottom: 18px; }
+
+  .kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 18px; }
+  .kpi { background: #12293a; border-radius: 10px; padding: 12px; text-align: center; }
+  .kpi .num { color: #d99e79; font-size: 22px; font-weight: 700; }
+  .kpi .label { color: #f0d9c8; font-size: 11px; opacity: 0.8; margin-top: 2px; }
+
+  .charts { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .chart-box { background: #12293a; border-radius: 10px; padding: 14px; }
+  .chart-box h3 { color: #f0d9c8; font-size: 13px; margin: 0 0 10px 0; font-weight: 600; }
+  .chart-box canvas { max-height: 180px; }
+
+  .low-stock { background: #12293a; border-radius: 10px; padding: 14px; margin-top: 14px; }
+  .low-stock h3 { color: #f0d9c8; font-size: 13px; margin: 0 0 10px 0; }
+  .stock-row { display: flex; justify-content: space-between; color: #f0d9c8; font-size: 12px; padding: 5px 0; border-bottom: 1px solid #2a4356; }
+  .stock-row span:last-child { color: #d99e79; font-weight: 600; }
+
+  .chatpanel { flex: 1; background: #4a4d5e; border-radius: 14px; display: flex; flex-direction: column; overflow: hidden; }
+  .header { background: #12293a; color: #f0d9c8; padding: 18px 24px; }
+  .header h1 { font-size: 18px; margin: 0; color: #f0d9c8; }
+  .header .sub { font-size: 12px; opacity: 0.7; margin-top: 2px; color: #d99e79; }
+  .status-dot { width: 8px; height: 8px; background: #d99e79; border-radius: 50%; display: inline-block; margin-right: 6px; }
+
+  .messages { flex: 1; padding: 20px; overflow-y: auto; background: #4a4d5e; }
+  .msg { max-width: 80%; margin-bottom: 14px; display: flex; flex-direction: column; }
+  .msg.user { margin-left: auto; align-items: flex-end; }
+  .msg.bot { margin-right: auto; align-items: flex-start; }
+  .bubble { padding: 12px 16px; border-radius: 14px; line-height: 1.4; font-size: 14px; }
+  .msg.user .bubble { background: #12293a; color: #f0d9c8; border-bottom-right-radius: 4px; }
+  .msg.bot .bubble { background: #a86f5e; color: #fff; border-bottom-left-radius: 4px; }
+
+  .routing-tag { font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 5px; padding: 3px 8px; border-radius: 4px; font-weight: 600; }
+  .routing-tag.sql { background: #12293a; color: #d99e79; }
+  .routing-tag.kb { background: #d99e79; color: #12293a; }
+  .routing-tag.none { background: #6b1f3a; color: #fbe2ea; }
+
+  .thinking { display: flex; gap: 4px; padding: 12px 16px; }
+  .thinking span { width: 6px; height: 6px; background: #f0d9c8; border-radius: 50%; animation: bounce 1.2s infinite; }
+  .thinking span:nth-child(2) { animation-delay: 0.2s; }
+  .thinking span:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes bounce { 0%, 60%, 100% { transform: translateY(0); } 30% { transform: translateY(-5px); } }
+
+  .input-row { display: flex; padding: 16px; border-top: 1px solid #3a3d4d; background: #4a4d5e; gap: 10px; }
+  .input-row input { flex: 1; padding: 12px 16px; border: 1px solid #6b6e7e; background: #3a3d4d; color: #f0d9c8; border-radius: 24px; font-size: 14px; outline: none; }
+  .input-row input::placeholder { color: #9a9daa; }
+  .input-row input:focus { border-color: #d99e79; }
+  .input-row button { background: #d99e79; color: #12293a; border: none; padding: 0 22px; border-radius: 24px; cursor: pointer; font-size: 14px; font-weight: 700; }
+  .input-row button:hover { background: #c98d68; }
+  .input-row button:disabled { background: #6b6e7e; color: #ccc; cursor: not-allowed; }
+
+  .suggestions { padding: 0 16px 12px; display: flex; gap: 8px; flex-wrap: wrap; background: #4a4d5e; }
+  .suggestions button { background: #3a3d4d; border: 1px solid #6b6e7e; color: #f0d9c8; font-size: 11px; padding: 6px 10px; border-radius: 16px; cursor: pointer; }
+  .suggestions button:hover { background: #a86f5e; color: #fff; }
+</style>
+</head>
+<body>
+
+<div class="layout">
+  <div class="dashboard">
+    <h2>M&P Studio</h2>
+    <div class="tagline">Live status across pharma, telecom, logistics and support</div>
+
+    <div class="kpis" id="kpis"></div>
+
+    <div class="charts">
+      <div class="chart-box">
+        <h3>Orders by Status</h3>
+        <canvas id="orderStatusChart"></canvas>
+      </div>
+      <div class="chart-box">
+        <h3>Support Tickets</h3>
+        <canvas id="supportChart"></canvas>
+      </div>
+      <div class="chart-box">
+        <h3>Pharma Sales by Rep</h3>
+        <canvas id="pharmaSalesChart"></canvas>
+      </div>
+      <div class="chart-box">
+        <h3>Telecom Sales by Rep</h3>
+        <canvas id="telecomSalesChart"></canvas>
+      </div>
+    </div>
+
+    <div class="low-stock" id="lowStock">
+      <h3>Low Stock Alert</h3>
+    </div>
+  </div>
+
+  <div class="chatpanel">
+    <div class="header">
+      <h1>M&P Studio AI</h1>
+      <div class="sub"><span class="status-dot"></span>Connected — running locally, zero API cost</div>
+    </div>
+
+    <div class="messages" id="messages">
+      <div class="msg bot">
+        <div class="bubble">Hi, I'm M&P Studio AI. I have access to pharma sales, telecom sales, support tickets, shipments, field visits and warehouse stock. Ask me anything.</div>
+      </div>
+    </div>
+
+    <div class="suggestions">
+      <button onclick="ask('What is the status of order APT-2026005?')">Order status</button>
+      <button onclick="ask('Show me open Samsung support tickets')">Support tickets</button>
+      <button onclick="ask('Show telecom sales performance')">Telecom sales</button>
+      <button onclick="ask('Which products are low on stock?')">Stock levels</button>
+    </div>
+
+    <div class="input-row">
+      <input type="text" id="input" placeholder="Ask about any department..." onkeydown="if(event.key==='Enter') send()">
+      <button id="sendBtn" onclick="send()">Send</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const API = 'http://127.0.0.1:8000';
+const messagesEl = document.getElementById('messages');
+const input = document.getElementById('input');
+const sendBtn = document.getElementById('sendBtn');
+
+const chartColors = ['#d99e79', '#a86f5e', '#12293a', '#f0d9c8', '#6b1f3a', '#4a4d5e'];
+
+function baseOptions() {
+  return {
+    plugins: { legend: { labels: { color: '#f0d9c8', font: { size: 10 } } } },
+    scales: {
+      x: { ticks: { color: '#f0d9c8', font: { size: 9 } }, grid: { color: '#2a4356' } },
+      y: { ticks: { color: '#f0d9c8', font: { size: 9 } }, grid: { color: '#2a4356' } }
+    }
+  };
+}
+
+async function loadDashboard() {
+  const res = await fetch(`${API}/dashboard`);
+  const data = await res.json();
+
+  const kpis = document.getElementById('kpis');
+  kpis.innerHTML = `
+    <div class="kpi"><div class="num">${data.totals.total_orders}</div><div class="label">Total Orders</div></div>
+    <div class="kpi"><div class="num">${data.totals.total_tickets}</div><div class="label">Support Tickets</div></div>
+    <div class="kpi"><div class="num">${data.totals.total_visits}</div><div class="label">Field Visits</div></div>
+    <div class="kpi"><div class="num">Rs ${(data.totals.total_revenue / 1000).toFixed(0)}k</div><div class="label">Total Revenue</div></div>
+  `;
+
+  new Chart(document.getElementById('orderStatusChart'), {
+    type: 'doughnut',
+    data: {
+      labels: data.order_status.map(r => r.status),
+      datasets: [{ data: data.order_status.map(r => r.count), backgroundColor: chartColors }]
+    },
+    options: baseOptions()
+  });
+
+  new Chart(document.getElementById('supportChart'), {
+    type: 'doughnut',
+    data: {
+      labels: data.support_status.map(r => r.status),
+      datasets: [{ data: data.support_status.map(r => r.count), backgroundColor: chartColors }]
+    },
+    options: baseOptions()
+  });
+
+  new Chart(document.getElementById('pharmaSalesChart'), {
+    type: 'bar',
+    data: {
+      labels: data.pharma_sales.map(r => r.rep_name),
+      datasets: [{ data: data.pharma_sales.map(r => r.revenue), backgroundColor: '#d99e79' }]
+    },
+    options: { ...baseOptions(), plugins: { legend: { display: false } } }
+  });
+
+  new Chart(document.getElementById('telecomSalesChart'), {
+    type: 'bar',
+    data: {
+      labels: data.telecom_sales.map(r => r.rep_name),
+      datasets: [{ data: data.telecom_sales.map(r => r.revenue), backgroundColor: '#a86f5e' }]
+    },
+    options: { ...baseOptions(), plugins: { legend: { display: false } } }
+  });
+
+  const lowStock = document.getElementById('lowStock');
+  lowStock.innerHTML = '<h3>Low Stock Alert</h3>' + data.low_stock.map(item => `
+    <div class="stock-row">
+      <span>${item.product_name} — ${item.warehouse_location}</span>
+      <span>${item.quantity_available} units</span>
+    </div>
+  `).join('');
+}
+
+function addMessage(text, sender, routing) {
+  const msg = document.createElement('div');
+  msg.className = `msg ${sender}`;
+
+  const bubble = document.createElement('div');
+  bubble.className = 'bubble';
+  bubble.textContent = text;
+  msg.appendChild(bubble);
+
+  if (routing) {
+    const tag = document.createElement('div');
+    const routingClass = routing.includes('structured') ? 'sql' : routing === 'no_match' ? 'none' : 'kb';
+    tag.className = `routing-tag ${routingClass}`;
+    tag.textContent = routing.includes('structured') ? routing.replace('structured_query ', '🗄️ ') : routing === 'no_match' ? 'No Match' : '📚 ' + routing;
+    msg.appendChild(tag);
+  }
+
+  messagesEl.appendChild(msg);
+  messagesEl.scrollTop = messagesEl.scrollHeight;
+}
+
+function showThinking() {
+  const msg = document.createElement('div');
+  msg.className = 'msg bot';
+  msg.id = 'thinking-indicator';
+  msg.innerHTML = '<div class="bubble thinking"><span></span><span></span><span></span></div>';
+  messagesEl.appendChild(msg);
+  messagesEl.scrollTop = messagesEl.scrollHeight;
+}
+
+function removeThinking() {
+  const el = document.getElementById('thinking-indicator');
+  if (el) el.remove();
+}
+
+async function send() {
+  const text = input.value.trim();
+  if (!text) return;
+
+  addMessage(text, 'user');
+  input.value = '';
+  sendBtn.disabled = true;
+  showThinking();
+
+  try {
+    const res = await fetch(`${API}/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: text })
+    });
+    const data = await res.json();
+    removeThinking();
+    addMessage(data.answer, 'bot', data.source);
+  } catch (err) {
+    removeThinking();
+    addMessage('Error reaching the backend. Make sure the FastAPI server is running.', 'bot');
+  }
+
+  sendBtn.disabled = false;
+  input.focus();
+}
+
+function ask(text) {
+  input.value = text;
+  send();
+}
+
+loadDashboard();
+</script>
+
+</body>
+</html>

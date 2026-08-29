@@ -1,62 +1,67 @@
- NPL x AppTak Integration — Backend & Mock Frontend
+# M&P Studio AI
 
-Internship project for **Muller & Phipps Company Private Limited**, building the backend integration between the Nouveaux Pharma Limited (NPL) website and the DawaAppTak/AppTak platform.
+This repository holds a small working demo I built during my internship at Muller and Phipps Company Private Limited. It is not a finished product. It is a proof of concept, built to show that an idea I proposed can actually work in practice, not just on paper.
 
+## The idea behind it
 
- What This Is
+While going through the internship, I noticed that Muller and Phipps runs a lot of separate applications for a lot of separate tasks. AppTak, DawaAppTak, DCRS, Salezman and M&P Survey all exist as their own islands, and none of them really talk to each other. If someone wants to know the status of an order, or what a field rep did last week, or how many support tickets are open, they have to go open a different app for each of those questions.
 
-Per the project brief, this implements the backend structure and logic for:
-- A NPL product listing with "Add to Cart" that hands off to an AppTak-style gateway
-- A shopping cart system
-- An order/checkout flow
-- A backend-configurable discount and pricing engine (product price, discount %, promo codes, validity dates, eligibility)
+The idea I pitched was simple. Build one internal AI assistant that can sit above all of these systems and answer questions from any department, using the real data each system already holds. The team liked the concept, so I was asked to build a working demo of it before anything real gets planned around it.
 
-Since access to AppTak's real production source code was intentionally not granted at this stage, this project builds an **authentic, fully-working backend** (real database schema, real business logic, real API) behind a **mock frontend** standing in for NPL's and AppTak's real pages. The intent is for this backend logic to be reviewed and then adapted directly into the real AppTak (Laravel) codebase.
+## What this repository actually is
 
- Tech Stack
+This is that demo. It proves the core mechanic works: a single chat interface that can understand what department a question belongs to, pull the right information, and answer in plain language.
 
-- **Backend:** PHP 8 / Laravel
-- **Database:** MySQL
-- **Frontend (mock):** Plain HTML/CSS/vanilla JS (Blade view), matching AppTak's confirmed Laravel/Blade stack
+Since I do not have access to M&P's real systems at this stage, everything here runs on realistic dummy data instead. The orders, shipments, support tickets, field visits and sales figures are all fake, but they are shaped exactly like the real thing would be, modeled closely after AppTak, DCRS and Salezman style records.
 
-## Database Schema
+## How it is built
 
-| Table | Purpose |
-|---|---|
-| `products` | NPL product catalog (name, SKU, price, description) |
-| `customers` | Customer/patient accounts |
-| `carts` / `cart_items` | Active shopping carts and their line items |
-| `discount_rules` | Admin-configurable pricing/discount/promo rules |
-| `orders` / `order_items` | Completed orders with final pricing after discounts |
+Everything in this demo runs for free, on a local machine, with no paid service involved anywhere.
 
-## API Endpoints
+* FastAPI handles the backend logic and decides what to do with each question
+* SQLite stores the dummy department data, no server or installation needed
+* Ollama runs a small AI model directly on the machine, so there is no API cost per question
+* Chart.js draws the live dashboard graphs straight from the same data
+* A plain HTML and JavaScript frontend ties the dashboard and chat together
 
-| Method | Endpoint | Purpose |
-|---|---|---|
-| GET/POST/PUT/DELETE | `/api/products` | Product CRUD |
-| GET/POST/PUT/DELETE | `/api/customers` | Customer CRUD |
-| GET/POST/PUT/DELETE | `/api/discount-rules` | Discount/promo rule CRUD |
-| POST | `/api/carts` | Add a product to cart ("Add to Cart") |
-| GET | `/api/carts/{id}` | View a cart |
-| POST | `/api/carts/{id}/handoff` | Hand off cart to AppTak gateway (mocked) |
-| DELETE | `/api/carts/{id}` | Delete a cart |
-| POST | `/api/orders` | Complete an order from a cart, applying a discount rule if provided |
-| GET | `/api/orders/{id}` | View an order |
-| PATCH | `/api/orders/{id}` | Update order status |
+## How it decides what to do
 
- Local Setup
+This is really the heart of the whole idea, and the part worth understanding before anything else. When a question comes in, the system does not just throw it at the AI model blindly. It first checks what kind of question it actually is.
 
-1. Clone the repo
-2. `composer install`
-3. Copy `.env.example` to `.env` and set your `DB_*` values
-4. `php artisan key:generate`
-5. `php artisan migrate`
-6. Visit the app root (`/`) for the mock NPL product page
+If the question is about something concrete, like an order number, a shipment, sales figures or a support ticket, it goes straight to the database and pulls the exact matching record. If the question is more general, like asking about a policy or how something works, it searches a small knowledge base of company information instead. Either way, the AI model only steps in at the very end, to turn whatever real data was found into a natural, readable answer, rather than guessing at one from scratch.
 
- Not Yet Implemented
+```
+                     user asks a question
+                              |
+                              v
+                     question classifier
+                    /                    \
+        looks structured               looks general
+       (order, shipment,               (policy, how
+        sales, ticket)                  something works)
+              |                                |
+              v                                v
+      query the real database         search the knowledge base
+      (SQLite for this demo)          (company documentation)
+              |                                |
+               \                              /
+                \                            /
+                 v                          v
+                    local AI model (Ollama)
+                turns the real result into a
+                     plain language answer
+                              |
+                              v
+                    shown back in the chat,
+               tagged with where it came from
+```
 
-- Admin panel UI for managing discount rules and pricing without direct API calls
-- Real integration with AppTak's production backend (pending access/approval)
-- Customer authentication flow (Sanctum installed, not yet wired to endpoints)
+In a real production version, the database side would be Muller and Phipps' actual systems, and the knowledge base would be actual company documentation, but the decision making shown above would work the exact same way.
 
-ALL DONE NOW ONLY SOURCE COD EINTEGRATION IS PENDING
+## Why this matters from a systems engineering angle
+
+This is not just a chatbot experiment. What is really being demonstrated here is a routing layer between multiple data sources and a single point of access, with a clear separation between where data lives, how it gets retrieved, and how it gets presented. That separation, deciding intent, fetching from the correct source, then generating a response, is a systems design problem before it is an AI problem. Getting that structure right, in a way that stays reliable and easy to extend as more departments and data sources get added, is exactly the kind of systems engineering work this internship has been about.
+
+## Running it
+
+Everything needed to run this demo locally is inside the project folder. It requires Python, FastAPI, Ollama with a small local model pulled, and a browser. No cloud account and no payment method is needed anywhere in this setup.
